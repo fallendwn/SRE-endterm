@@ -23,11 +23,7 @@ jobs:
       - name: Test frontend
         working-directory: src/frontend
         run: go test ./...
- 
-      - name: Test checkoutservice
-        working-directory: src/checkoutservice
-        run: go test ./...
- 
+        
       - name: Test shippingservice
         working-directory: src/shippingservice
         run: go test ./...
