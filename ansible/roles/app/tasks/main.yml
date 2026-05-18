@@ -32,8 +32,11 @@
   shell: sed -i 's/\r//' {{ app_dir }}/release/.env
   changed_when: false
 
+
 - name: Build Docker images with Compose
-  shell: docker compose build --parallel
+  shell: |
+    services=$(docker compose config --services | grep -v adservice | tr '\n' ' ')
+    docker compose build --parallel $services
   args:
     chdir: "{{ app_dir }}/release"
   become_user: ubuntu
