@@ -1,0 +1,62 @@
+name: CI/CD
+ 
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+ 
+jobs:
+  test:
+    name: Go Health Tests
+    runs-on: ubuntu-latest
+ 
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+ 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+ 
+      - name: Test frontend
+        working-directory: src/frontend
+        run: go test ./...
+ 
+      - name: Test checkoutservice
+        working-directory: src/checkoutservice
+        run: go test ./...
+ 
+      - name: Test shippingservice
+        working-directory: src/shippingservice
+        run: go test ./...
+ 
+      - name: Test productcatalogservice
+        working-directory: src/productcatalogservice
+        run: go test ./...
+ 
+  deploy:
+    name: Deploy via Ansible
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+ 
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+ 
+      - name: Install Ansible
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ansible rsync
+ 
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+ 
+      - name: Run Ansible playbook
+        working-directory: ansible
+        run: ansible-playbook -i inventory.ini site.yml
