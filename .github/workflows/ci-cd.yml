@@ -6,7 +6,11 @@ on:
   pull_request:
     branches: [master]
  
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+ 
 jobs:
+  # ─── STAGE 1: TESTS ───────────────────────────────────────────
   test:
     name: Go Health Tests
     runs-on: ubuntu-latest
@@ -19,11 +23,15 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.22'
+          cache-dependency-path: |
+            src/frontend/go.sum
+            src/shippingservice/go.sum
+            src/productcatalogservice/go.sum
  
       - name: Test frontend
         working-directory: src/frontend
         run: go test ./...
-        
+ 
       - name: Test shippingservice
         working-directory: src/shippingservice
         run: go test ./...
@@ -32,11 +40,12 @@ jobs:
         working-directory: src/productcatalogservice
         run: go test ./...
  
+  # ─── STAGE 2: DEPLOY ──────────────────────────────────────────
   deploy:
     name: Deploy via Ansible
     runs-on: ubuntu-latest
     needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
  
     steps:
       - name: Checkout code
@@ -56,3 +65,4 @@ jobs:
       - name: Run Ansible playbook
         working-directory: ansible
         run: ansible-playbook -i inventory.ini site.yml
+ 
