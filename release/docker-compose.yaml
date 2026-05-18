@@ -1,0 +1,338 @@
+services:
+
+  gateway:
+    image: gateway:local
+    build:
+      context: ./nginx
+    restart: unless-stopped
+    ports:
+      - "${HOST_HTTP_PORT}:${GATEWAY_PORT}"
+    depends_on:
+      frontend:
+        condition: service_healthy
+      auth-frontend:
+        condition: service_healthy
+      authservice:
+        condition: service_healthy
+    networks:
+      - microservices-net
+
+  frontend:
+    image: frontend:local
+    build:
+      context: ../src/frontend
+    restart: unless-stopped
+    environment:
+      PORT: ${FRONTEND_PORT}
+      PRODUCT_CATALOG_SERVICE_ADDR: productcatalogservice:${PRODUCTCATALOG_PORT}
+      CART_SERVICE_ADDR: cartservice:${CART_PORT}
+      CHECKOUT_SERVICE_ADDR: checkoutservice:${CHECKOUT_PORT}
+      CURRENCY_SERVICE_ADDR: currencyservice:${CURRENCY_PORT}
+      SHIPPING_SERVICE_ADDR: shippingservice:${SHIPPING_PORT}
+      PAYMENT_SERVICE_ADDR: paymentservice:${PAYMENT_PORT}
+      EMAIL_SERVICE_ADDR: emailservice:${EMAIL_PORT}
+      AD_SERVICE_ADDR: adservice:${AD_PORT}
+      RECOMMENDATION_SERVICE_ADDR: recommendationservice:${RECOMMENDATION_PORT}
+    depends_on:
+      productcatalogservice:
+        condition: service_healthy
+      cartservice:
+        condition: service_healthy
+      checkoutservice:
+        condition: service_healthy
+      currencyservice:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${FRONTEND_PORT}/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - microservices-net
+
+  authservice:
+    image: authservice:local
+    build:
+      context: ./authservice
+    restart: unless-stopped
+    environment:
+      PORT: ${AUTH_PORT}
+      SECRET_KEY: ${AUTH_SECRET_KEY}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${AUTH_PORT}/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - microservices-net
+
+  auth-frontend:
+    image: auth-frontend:local
+    build:
+      context: ./authservice/frontend
+    restart: unless-stopped
+    environment:
+      PORT: ${AUTHFRONTEND_PORT}
+    depends_on:
+      authservice:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${AUTHFRONTEND_PORT}/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - microservices-net
+
+  productcatalogservice:
+    image: productcatalogservice:local
+    build:
+      context: ../src/productcatalogservice
+    restart: unless-stopped
+    environment:
+      PORT: ${PRODUCTCATALOG_PORT}
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=localhost:${PRODUCTCATALOG_PORT}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - microservices-net
+
+  currencyservice:
+    image: currencyservice:local
+    build:
+      context: ../src/currencyservice
+    restart: unless-stopped
+    environment:
+      PORT: ${CURRENCY_PORT}
+      DISABLE_PROFILER: 1
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=localhost:${CURRENCY_PORT}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - microservices-net
+
+  cartservice:
+    image: cartservice:local
+    build:
+      context: ../src/cartservice/src
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis-cart:${REDIS_PORT}
+      PORT: ${CART_PORT}
+      ASPNETCORE_URLS: http://+:${CART_PORT}
+    depends_on:
+      redis-cart:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost ${CART_PORT} || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - microservices-net
+
+  checkoutservice:
+    image: checkoutservice:local
+    build:
+      context: ../src/checkoutservice
+    restart: unless-stopped
+    environment:
+      PORT: ${CHECKOUT_PORT}
+      PRODUCT_CATALOG_SERVICE_ADDR: productcatalogservice:${PRODUCTCATALOG_PORT}
+      CART_SERVICE_ADDR: cartservice:${CART_PORT}
+      SHIPPING_SERVICE_ADDR: shippingservice:${SHIPPING_PORT}
+      PAYMENT_SERVICE_ADDR: paymentservice:${PAYMENT_PORT}
+      CURRENCY_SERVICE_ADDR: currencyservice:${CURRENCY_PORT}
+      EMAIL_SERVICE_ADDR: emailservice:${EMAIL_PORT}
+    depends_on:
+      productcatalogservice:
+        condition: service_healthy
+      cartservice:
+        condition: service_healthy
+      currencyservice:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=localhost:${CHECKOUT_PORT}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - microservices-net
+
+  shippingservice:
+    image: shippingservice:local
+    build:
+      context: ../src/shippingservice
+    restart: unless-stopped
+    environment:
+      PORT: ${SHIPPING_PORT}
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=localhost:${SHIPPING_PORT}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - microservices-net
+
+  paymentservice:
+    image: paymentservice:local
+    build:
+      context: ../src/paymentservice
+    restart: unless-stopped
+    environment:
+      PORT: ${PAYMENT_PORT}
+      DISABLE_PROFILER: 1
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=localhost:${PAYMENT_PORT}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - microservices-net
+
+  emailservice:
+    image: emailservice:local
+    build:
+      context: ../src/emailservice
+    restart: unless-stopped
+    environment:
+      PORT: ${EMAIL_PORT}
+      DISABLE_PROFILER: 1
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=localhost:${EMAIL_PORT}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - microservices-net
+
+  recommendationservice:
+    image: recommendationservice:local
+    build:
+      context: ../src/recommendationservice
+    restart: unless-stopped
+    environment:
+      PORT: ${RECOMMENDATION_PORT}
+      DISABLE_PROFILER: 1
+      PRODUCT_CATALOG_SERVICE_ADDR: productcatalogservice:${PRODUCTCATALOG_PORT}
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=localhost:${RECOMMENDATION_PORT}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - microservices-net
+
+  adservice:
+    image: adservice:local
+    build:
+      context: ../src/adservice
+    restart: unless-stopped
+    environment:
+      PORT: ${AD_PORT}
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=localhost:${AD_PORT}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    networks:
+      - microservices-net
+
+  redis-cart:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - microservices-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT}:${PROMETHEUS_PORT}"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:${PROMETHEUS_PORT}/-/healthy || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - microservices-net
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT}:${GRAFANA_PORT}"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${GRAFANA_PORT}/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - microservices-net
+  yamlloki:
+    image: grafana/loki:2.9.0
+    container_name: loki
+    ports:
+      - "${LOKI_PORT}:${LOKI_PORT}"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - microservices-net
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: promtail
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./promtail-config.yml:/etc/promtail/promtail-config.yml
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - microservices-net
+  blackbox:
+    image: prom/blackbox-exporter:latest
+    container_name: blackbox
+    ports:
+      - "${BLACKBOX_PORT}:${BLACKBOX_PORT}"
+    networks:
+      - microservices-net
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    ports:
+      - "${NODE_PORT}:${NODE_PORT}"
+    networks:
+      - microservices-net
+networks:
+  microservices-net:
+    driver: bridge

@@ -1,0 +1,21 @@
+---
+- name: Get private IP of the host
+  shell: hostname -I | awk '{print $1}'
+  register: private_ip
+  changed_when: false
+
+- name: Initialize Docker Swarm
+  shell: docker swarm init --advertise-addr {{ private_ip.stdout | trim }}
+  register: swarm_init
+  failed_when:
+    - swarm_init.rc != 0
+    - "'already part of a swarm' not in swarm_init.stderr"
+  changed_when: swarm_init.rc == 0
+
+- name: Create overlay network for microservices
+  shell: docker network create --driver overlay --attachable microservices-net
+  register: net_create
+  failed_when:
+    - net_create.rc != 0
+    - "'already exists' not in net_create.stderr"
+  changed_when: net_create.rc == 0

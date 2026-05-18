@@ -1,0 +1,83 @@
+---
+- name: Create app directory
+  file:
+    path: "{{ app_dir }}"
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: '0755'
+
+- name: Copy project files to VM
+  synchronize:
+    src: "{{ playbook_dir }}/../../output/"
+    dest: "{{ app_dir }}/"
+    delete: yes
+    rsync_opts:
+      - "--exclude=.git"
+      - "--exclude=ansible"
+      - "--exclude=docs"
+      - "--exclude=kubernetes-manifests"
+      - "--exclude=helm-chart"
+      - "--exclude=kustomize"
+  become: false
+
+- name: Set ownership of app directory
+  file:
+    path: "{{ app_dir }}"
+    owner: ubuntu
+    group: ubuntu
+    recurse: yes
+
+- name: Fix .env line endings (CRLF → LF)
+  shell: sed -i 's/\r//' {{ app_dir }}/release/.env
+  changed_when: false
+
+- name: Build Docker images with Compose
+  shell: docker compose build --parallel
+  args:
+    chdir: "{{ app_dir }}/release"
+  become_user: ubuntu
+  environment:
+    DOCKER_BUILDKIT: "1"
+
+- name: Deploy stack to Docker Swarm
+  shell: |
+    set -a
+    source .env
+    set +a
+    docker stack deploy --with-registry-auth -c docker-swarm.yml microservices
+  args:
+    chdir: "{{ app_dir }}/release"
+    executable: /bin/bash
+  become_user: ubuntu
+
+- name: Wait for Swarm services to converge
+  shell: |
+    RETRIES=20
+    for i in $(seq 1 $RETRIES); do
+      NOT_CONVERGED=$(docker stack services microservices \
+        --format '{% raw %}{{.Replicas}}{% endraw %}' \
+        | awk -F'/' '$1 != $2 {print}' || true)
+      if [ -z "$NOT_CONVERGED" ]; then
+        echo "All services converged."
+        exit 0
+      fi
+      echo "Waiting... attempt $i/$RETRIES"
+      sleep 10
+    done
+    docker stack services microservices
+    exit 1
+  args:
+    executable: /bin/bash
+  changed_when: false
+  register: converge_check
+  failed_when: converge_check.rc != 0
+
+- name: Print Swarm service status
+  shell: docker stack services microservices
+  register: swarm_status
+  changed_when: false
+
+- name: Show service list
+  debug:
+    var: swarm_status.stdout_lines

@@ -1,0 +1,305 @@
+# Docker Swarm Stack — all microservices
+# Deploy: docker stack deploy -c docker-swarm.yml microservices
+version: "3.9"
+
+services:
+
+  gateway:
+    image: gateway:local
+    ports:
+      - "80:80"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    networks:
+      - microservices-net
+
+  frontend:
+    image: frontend:local
+    environment:
+      PORT: "${FRONTEND_PORT:-8080}"
+      PRODUCT_CATALOG_SERVICE_ADDR: "productcatalogservice:${PRODUCTCATALOG_PORT:-3550}"
+      CART_SERVICE_ADDR: "cartservice:${CART_PORT:-7070}"
+      CHECKOUT_SERVICE_ADDR: "checkoutservice:${CHECKOUT_PORT:-5050}"
+      CURRENCY_SERVICE_ADDR: "currencyservice:${CURRENCY_PORT:-7000}"
+      SHIPPING_SERVICE_ADDR: "shippingservice:${SHIPPING_PORT:-50051}"
+      PAYMENT_SERVICE_ADDR: "paymentservice:${PAYMENT_PORT:-50051}"
+      EMAIL_SERVICE_ADDR: "emailservice:${EMAIL_PORT:-8080}"
+      AD_SERVICE_ADDR: "adservice:${AD_PORT:-9555}"
+      RECOMMENDATION_SERVICE_ADDR: "recommendationservice:${RECOMMENDATION_PORT:-8080}"
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    networks:
+      - microservices-net
+
+  authservice:
+    image: authservice:local
+    environment:
+      PORT: "${AUTH_PORT:-8081}"
+      SECRET_KEY: "${AUTH_SECRET_KEY:-changeme}"
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: 128M
+    networks:
+      - microservices-net
+
+  auth-frontend:
+    image: auth-frontend:local
+    environment:
+      PORT: "${AUTHFRONTEND_PORT:-8082}"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    networks:
+      - microservices-net
+
+  productcatalogservice:
+    image: productcatalogservice:local
+    environment:
+      PORT: "${PRODUCTCATALOG_PORT:-3550}"
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    networks:
+      - microservices-net
+
+  cartservice:
+    image: cartservice:local
+    environment:
+      REDIS_ADDR: "redis-cart:${REDIS_PORT:-6379}"
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    networks:
+      - microservices-net
+
+  checkoutservice:
+    image: checkoutservice:local
+    environment:
+      PORT: "${CHECKOUT_PORT:-5050}"
+      PRODUCT_CATALOG_SERVICE_ADDR: "productcatalogservice:${PRODUCTCATALOG_PORT:-3550}"
+      CART_SERVICE_ADDR: "cartservice:${CART_PORT:-7070}"
+      SHIPPING_SERVICE_ADDR: "shippingservice:${SHIPPING_PORT:-50051}"
+      PAYMENT_SERVICE_ADDR: "paymentservice:${PAYMENT_PORT:-50051}"
+      CURRENCY_SERVICE_ADDR: "currencyservice:${CURRENCY_PORT:-7000}"
+      EMAIL_SERVICE_ADDR: "emailservice:${EMAIL_PORT:-8080}"
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    networks:
+      - microservices-net
+
+  currencyservice:
+    image: currencyservice:local
+    environment:
+      PORT: "${CURRENCY_PORT:-7000}"
+      DISABLE_PROFILER: "1"
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: 128M
+    networks:
+      - microservices-net
+
+  shippingservice:
+    image: shippingservice:local
+    environment:
+      PORT: "${SHIPPING_PORT:-50051}"
+      DISABLE_PROFILER: "1"
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: 128M
+    networks:
+      - microservices-net
+
+  paymentservice:
+    image: paymentservice:local
+    environment:
+      PORT: "${PAYMENT_PORT:-50051}"
+      DISABLE_PROFILER: "1"
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: 128M
+    networks:
+      - microservices-net
+
+  emailservice:
+    image: emailservice:local
+    environment:
+      PORT: "${EMAIL_PORT:-8080}"
+      DISABLE_PROFILER: "1"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: 128M
+    networks:
+      - microservices-net
+
+  recommendationservice:
+    image: recommendationservice:local
+    environment:
+      PORT: "${RECOMMENDATION_PORT:-8080}"
+      PRODUCT_CATALOG_SERVICE_ADDR: "productcatalogservice:${PRODUCTCATALOG_PORT:-3550}"
+      DISABLE_PROFILER: "1"
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: 256M
+    networks:
+      - microservices-net
+
+  adservice:
+    image: adservice:local
+    environment:
+      PORT: "${AD_PORT:-9555}"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    networks:
+      - microservices-net
+
+  redis-cart:
+    image: redis:7-alpine
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 128M
+    networks:
+      - microservices-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
+      - source: alert_rules
+        target: /etc/prometheus/alert_rules.yml
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      - microservices-net
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-admin}"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      - microservices-net
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    ports:
+      - "9100:9100"
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+    networks:
+      - microservices-net
+
+configs:
+  prometheus_config:
+    file: ./prometheus.yml
+  alert_rules:
+    file: ./alert_rules.yml
+
+networks:
+  microservices-net:
+    external: true

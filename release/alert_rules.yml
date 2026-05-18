@@ -1,0 +1,36 @@
+groups:
+  - name: microservices_alerts
+    rules:
+
+      - alert: ServiceDown
+        expr: probe_success == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.instance }} is unavailable >30s"
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[1m]) * 100 > 70
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU (70%) {{ $labels.job }}"
+
+      - alert: HighMemoryUsage
+        expr: (process_resident_memory_bytes / 1024 / 1024) > 512
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory load {{ $labels.job }}"
+
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[1m]) > 0.05
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate on {{ $labels.job }}"
+

@@ -24,11 +24,6 @@ Dockerfile.pip
 node_modules/
 obj/
 pkg/
-release/wi-kubernetes-manifests.yaml
 vendor/
 terraform.tfvars
-.ansible
-/ansible
-.release
-/release
 /terraform

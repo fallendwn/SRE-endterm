@@ -1,0 +1,75 @@
+---
+- name: Check Prometheus service in Swarm
+  shell: docker service ls --filter name=microservices_prometheus --format {% raw %}"{{.Replicas}}"{% endraw %}
+  register: prom_replicas
+  changed_when: false
+
+- name: Assert Prometheus is running
+  assert:
+    that: "'1/1' in prom_replicas.stdout"
+    fail_msg: "Prometheus не запустился: {{ prom_replicas.stdout }}"
+    success_msg: "Prometheus работает нормально"
+
+- name: Check Grafana service in Swarm
+  shell: docker service ls --filter name=microservices_grafana --format {% raw %}"{{.Replicas}}"{% endraw %}
+  register: grafana_replicas
+  changed_when: false
+
+- name: Assert Grafana is running
+  assert:
+    that: "'1/1' in grafana_replicas.stdout"
+    fail_msg: "Grafana не запустилась: {{ grafana_replicas.stdout }}"
+    success_msg: "Grafana работает нормально"
+
+- name: Check node-exporter service in Swarm
+  shell: docker service ls --filter name=microservices_node-exporter --format {% raw %}"{{.Replicas}}"{% endraw %}
+  register: node_exporter_replicas
+  changed_when: false
+
+- name: Show node-exporter status
+  debug:
+    msg: "node-exporter: {{ node_exporter_replicas.stdout }}"
+
+- name: Wait for frontend HTTP healthcheck
+  shell: |
+    for i in $(seq 1 10); do
+      if curl -sf --max-time 5 http://localhost/_healthz > /dev/null 2>&1; then
+        echo "OK"
+        exit 0
+      fi
+      sleep 5
+    done
+    exit 1
+  args:
+    executable: /bin/bash
+  changed_when: false
+
+- name: Wait for Prometheus HTTP response
+  shell: curl -sf --max-time 5 http://localhost:9090/-/healthy
+  register: prom_health
+  retries: 6
+  delay: 5
+  until: prom_health.rc == 0
+  changed_when: false
+
+- name: Wait for Grafana HTTP response
+  shell: curl -sf --max-time 5 http://localhost:3000/api/health
+  register: grafana_health
+  retries: 6
+  delay: 5
+  until: grafana_health.rc == 0
+  changed_when: false
+
+- name: Get public IP
+  shell: curl -sf --max-time 5 ifconfig.me
+  register: public_ip
+  changed_when: false
+  failed_when: false
+
+- name: Print access URLs
+  debug:
+    msg:
+      - "=== Деплой завершён успешно ==="
+      - "Приложение:  http://{{ public_ip.stdout | default(ansible_host) }}"
+      - "Grafana:     http://{{ public_ip.stdout | default(ansible_host) }}:3000"
+      - "Prometheus:  http://{{ public_ip.stdout | default(ansible_host) }}:9090"

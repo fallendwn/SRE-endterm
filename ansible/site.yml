@@ -1,0 +1,12 @@
+---
+- name: Full deployment — Docker Swarm + Microservices + Monitoring
+  hosts: swarm_manager
+  become: true
+  vars:
+    app_dir: /opt/app
+
+  roles:
+    - docker
+    - swarm
+    - app
+    - monitoring
